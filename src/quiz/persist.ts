@@ -98,7 +98,7 @@ export function buildSearch(marketing: URLSearchParams): string {
   return s ? `?${s}` : "";
 }
 
-export function writeLocation(step: StepId, answers: QuizAnswers, snapshot: QuizSnapshot, mode: "push" | "replace") {
+export function writeLocation(_step: StepId, _answers: QuizAnswers, snapshot: QuizSnapshot, mode: "push" | "replace") {
   if (typeof window === "undefined") return;
   const marketing = marketingFromSearch(new URLSearchParams(window.location.search));
   const url = `${window.location.pathname}${buildSearch(marketing)}${window.location.hash}`;
