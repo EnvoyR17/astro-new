@@ -748,10 +748,13 @@ h2.q.q-chip {
   animation: bob 6s ease-in-out infinite;
 }
 .float-tag-inner {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  max-width: 160px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(188px, 48vw);
   padding: 6px 9px;
   border-radius: 18px;
   border: 1px solid #6239c0;
@@ -759,7 +762,9 @@ h2.q.q-chip {
   font-size: 12px;
   font-weight: 300;
   line-height: 1.25;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: break-word;
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   box-shadow: 0 4px 14px rgba(10, 6, 24, 0.35);
