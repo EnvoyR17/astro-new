@@ -610,7 +610,7 @@ export function Q19Step() {
       return;
     }
 
-    const MIN_MS = 800;
+    const MIN_MS = 4000;
     const MAX_MS = 6800;
     const FINISH_MS = 340;
 
