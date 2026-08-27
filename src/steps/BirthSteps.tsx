@@ -4,6 +4,7 @@ import { DATE_MIN_YEAR, MONTHS_FULL, accentify } from "../quiz/flow";
 import { searchPlaces, FALLBACK_PLACE, type PlaceHit } from "../quiz/searchPlaces";
 import { DEFAULT_TIME } from "../quiz/persist";
 import { useQuiz } from "../quiz/QuizProvider";
+import { ensurePalmRuntime, isPalmRuntimeReady, warmPalmRuntime } from "../palm/tracker";
 import { Nav } from "../components/Nav";
 import { Chev } from "../components/Icons";
 import { TextSelectStep } from "./SelectTemplates";
@@ -586,7 +587,7 @@ export function Q18aStep() {
 export function Q19Step() {
   const { answers, datePick, go, skipTimedAdvance } = useQuiz();
   const s = QUIZ_COPY.step19;
-  const durationMs = 4000;
+  const [pct, setPct] = useState(0);
 
   const dateLabel = useMemo(() => {
     const y = DATE_MIN_YEAR + datePick.y;
@@ -604,18 +605,58 @@ export function Q19Step() {
     : s.titleNoTime.replace("{date}", dateLabel);
 
   useEffect(() => {
-    if (skipTimedAdvance) return;
-    let done = false;
-    const t = window.setTimeout(() => {
-      if (done) return;
-      done = true;
-      go("q21");
-    }, durationMs);
+    if (skipTimedAdvance) {
+      void warmPalmRuntime();
+      return;
+    }
+
+    const MIN_MS = 800;
+    const MAX_MS = 6800;
+    const FINISH_MS = 340;
+
+    let gone = false;
+    let raf = 0;
+    let closing: { from: number; t0: number } | null = null;
+    const t0 = performance.now();
+    void warmPalmRuntime();
+
+    const tick = (now: number) => {
+      if (gone) return;
+      const elapsed = now - t0;
+      const ready = isPalmRuntimeReady();
+
+      if (!closing) {
+        const crawl = ready
+          ? Math.min(0.88, (elapsed / MIN_MS) * 0.88)
+          : Math.min(0.92, (elapsed / MAX_MS) * 0.92);
+        if ((ready && elapsed >= MIN_MS) || elapsed >= MAX_MS) {
+          closing = { from: crawl, t0: now };
+        } else {
+          setPct(crawl * 100);
+        }
+      }
+
+      if (closing) {
+        const t = Math.min(1, (now - closing.t0) / FINISH_MS);
+        const eased = 1 - (1 - t) ** 2;
+        setPct((closing.from + (1 - closing.from) * eased) * 100);
+        if (t >= 1) {
+          go("q21");
+          return;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
     return () => {
-      done = true;
-      window.clearTimeout(t);
+      gone = true;
+      cancelAnimationFrame(raf);
     };
   }, [go, skipTimedAdvance]);
+
+  const continueWhenReady = () => {
+    void ensurePalmRuntime(20_000).then(() => go("q21"));
+  };
 
   return (
     <section className="page lilac">
@@ -636,11 +677,15 @@ export function Q19Step() {
           </div>
         </div>
         {skipTimedAdvance ? (
-          <button type="button" className="cta-ckpt tap" onClick={() => go("q21")}>
+          <button type="button" className="cta-ckpt tap" onClick={continueWhenReady}>
             Продолжить
           </button>
         ) : (
-          <TimedFillBar durationMs={durationMs} />
+          <div className="timed-bar" aria-hidden>
+            <div className="timed-bar-track">
+              <div className="timed-bar-fill" style={{ width: `${pct}%`, transition: "none" }} />
+            </div>
+          </div>
         )}
       </div>
     </section>

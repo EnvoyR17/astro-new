@@ -8,6 +8,7 @@ const MODEL =
 let filesetPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
 let modelPrefetch: Promise<unknown> | null = null;
 let videoReady: Promise<HandLandmarker> | null = null;
+let videoOk = false;
 
 function fileset() {
   if (!filesetPromise) filesetPromise = FilesetResolver.forVisionTasks(WASM);
@@ -40,14 +41,37 @@ export function warmPalmRuntime() {
   prefetchModel();
   void fileset();
   if (!videoReady) {
-    videoReady = create("VIDEO").catch((err) => {
-      videoReady = null;
-      throw err;
-    });
+    videoOk = false;
+    videoReady = create("VIDEO")
+      .then((lm) => {
+        videoOk = true;
+        return lm;
+      })
+      .catch((err) => {
+        videoReady = null;
+        videoOk = false;
+        throw err;
+      });
   }
   return videoReady;
 }
 
+export function isPalmRuntimeReady(): boolean {
+  return videoOk;
+}
+
+export async function ensurePalmRuntime(timeoutMs = 20_000): Promise<void> {
+  try {
+    await Promise.race([
+      warmPalmRuntime(),
+      new Promise<void>((_, reject) => {
+        window.setTimeout(() => reject(new Error("palm-timeout")), timeoutMs);
+      }),
+    ]);
+  } catch {
+    /* Camera will create its own instance if this failed or timed out. */
+  }
+}
 /** Reuse the warmed VIDEO instance; otherwise create one. */
 export async function openVideoLandmarker() {
   const pending = videoReady;
