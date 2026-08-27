@@ -109,7 +109,7 @@ function warmImages(urls: string[]) {
 function warmPalm() {
   if (palmWarm) return;
   palmWarm = import("../palm/tracker")
-    .then((m) => m.getImageLandmarker())
+    .then((m) => m.warmPalmRuntime())
     .catch(() => {
       palmWarm = null;
     });
@@ -127,7 +127,9 @@ export function schedulePreload(step: StepId, answers: QuizAnswers): () => void 
     const targets = saveData() ? upcoming(step, answers, 1) : upcoming(step, answers, 2);
     const urls = targets.flatMap((id) => assetsFor(id, answers));
     warmImages(urls);
-    const palmSoon = [step, ...targets].some((id) => id === "q18a" || id === "q19" || id === "q21");
+    const palmSoon = [step, ...targets].some(
+      (id) => id === "q17" || id === "q18" || id === "q18a" || id === "q19" || id === "q21",
+    );
     if (palmSoon && !saveData()) warmPalm();
   };
 

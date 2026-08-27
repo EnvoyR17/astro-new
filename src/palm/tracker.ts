@@ -6,14 +6,25 @@ const MODEL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
 let filesetPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
+let modelPrefetch: Promise<unknown> | null = null;
+let videoReady: Promise<HandLandmarker> | null = null;
 
 function fileset() {
   if (!filesetPromise) filesetPromise = FilesetResolver.forVisionTasks(WASM);
   return filesetPromise;
 }
 
+function prefetchModel() {
+  if (!modelPrefetch) {
+    modelPrefetch = fetch(MODEL, { mode: "cors", credentials: "omit" }).catch(() => {
+      modelPrefetch = null;
+    });
+  }
+  return modelPrefetch;
+}
+
 async function create(mode: "VIDEO" | "IMAGE") {
-  const fs = await fileset();
+  const [, fs] = await Promise.all([prefetchModel(), fileset()]);
   return HandLandmarker.createFromOptions(fs, {
     baseOptions: { modelAssetPath: MODEL, delegate: "CPU" },
     runningMode: mode,
@@ -24,8 +35,30 @@ async function create(mode: "VIDEO" | "IMAGE") {
   });
 }
 
-/** New instance per camera session so timestamps and WASM state reset. */
+/** Start WASM + model + VIDEO landmarker before the camera screen. */
+export function warmPalmRuntime() {
+  prefetchModel();
+  void fileset();
+  if (!videoReady) {
+    videoReady = create("VIDEO").catch((err) => {
+      videoReady = null;
+      throw err;
+    });
+  }
+  return videoReady;
+}
+
+/** Reuse the warmed VIDEO instance; otherwise create one. */
 export async function openVideoLandmarker() {
+  const pending = videoReady;
+  videoReady = null;
+  if (pending) {
+    try {
+      return await pending;
+    } catch {
+      return create("VIDEO");
+    }
+  }
   return create("VIDEO");
 }
 
